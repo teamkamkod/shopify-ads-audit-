@@ -16,7 +16,8 @@ database.sqlite
 .env
 .env.*
 
-package-lock.json
+# We commit package-lock.json (npm only) so installs are reproducible
+# and `npm ci` can skip full dependency resolution.
 yarn.lock
 pnpm-lock.yaml
 
