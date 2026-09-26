@@ -51,13 +51,41 @@ Le catalogue produit d'une boutique est audité jusqu'à la limite de SKUs
 de son palier (`app/routes/app._index.tsx` passe `skuLimit` à
 `fetchAllProductsForAudit`) ; au-delà, un bandeau invite à upgrader.
 
-> Le ré-audit automatique (hebdomadaire pour Starter, quotidien pour
-> Growth/Scale) n'est pas planifié par cette app elle-même — Shopify
-> n'offre pas de cron applicatif. Il faut un déclencheur externe (ex. cron
-> du VPS) qui appelle une route dédiée exécutant la même logique que
-> `app/routes/app._index.tsx` (`action`), à une fréquence par boutique
-> dérivée de `planDefinition(tier).reAuditFrequency`. À implémenter avant
-> la soumission App Store si ce point est mis en avant dans le listing.
+Le ré-audit automatique (hebdomadaire pour Starter, quotidien pour
+Growth/Scale) est exposé sur `POST /cron/reaudit`
+(`app/routes/cron.reaudit.tsx`) : Shopify n'offre pas de cron applicatif,
+donc cette route est pensée pour être appelée par un déclencheur externe
+(crontab du VPS). Elle est protégée par un secret partagé, pas par une
+session Shopify — définir `CRON_SECRET` dans l'environnement et appeler :
+
+```shell
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://audit.kamkod.com/cron/reaudit
+```
+
+À chaque appel, la route parcourt toutes les boutiques sur un palier payant
+et ne ré-audite que celles dont le dernier audit `cron` date de plus d'un
+jour (Growth/Scale) ou 7 jours (Starter) — donc sans risque à appeler plus
+souvent que nécessaire (ex. `crontab -e` : `0 * * * *` toutes les heures).
+Exemple d'entrée crontab :
+
+```
+0 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://audit.kamkod.com/cron/reaudit
+```
+
+L'envoi d'une alerte email sur un nouvel audit bloquant reste un TODO
+(marqué dans `app/services/audit-runner.server.ts`) — nécessite un
+fournisseur d'email transactionnel (Resend/Postmark) non encore câblé ;
+le nouvel audit apparaît déjà dans l'historique du dashboard entre-temps.
+
+## Export CSV (Growth / Scale)
+
+`app/routes/app.export-csv.tsx` (`GET /app/export-csv`, session Shopify
+authentifiée) exporte le dernier audit de la boutique en CSV (produit,
+champ OpenAI, sévérité, message). Gate sur `planDefinition(tier).csvExport`
+— renvoie 403 pour Free/Starter. Lien affiché dans le dashboard
+(`app/routes/app._index.tsx`) uniquement quand la fonctionnalité est
+disponible sur le palier courant.
 
 ## Conformité GDPR (obligatoire pour la review App Store)
 
@@ -152,7 +180,9 @@ Workers).
    ou fichier compose) : `DATABASE_URL`, `DIRECT_URL`, `SHOPIFY_API_KEY`,
    `SHOPIFY_API_SECRET`, `SCOPES` (`read_products,write_products`),
    `SHOPIFY_APP_URL` (l'URL publique de production, ex.
-   `https://audit.kamkod.com`).
+   `https://audit.kamkod.com`), `CRON_SECRET` (chaîne aléatoire générée,
+   ex. `openssl rand -hex 32` — protège `/cron/reaudit`, voir section
+   ci-dessus).
 3. `npm run docker-start` (déjà la commande par défaut du Dockerfile)
    exécute `prisma migrate deploy` puis démarre le serveur — les
    migrations tournent donc à chaque démarrage du conteneur.

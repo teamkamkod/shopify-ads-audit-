@@ -37,15 +37,16 @@ model Session {
 // One row per shop; created lazily on first audit or billing interaction.
 model ShopSettings {
   shop      String   @id
-  plan      String   @default("free") // free | pro | agence
+  plan      String   @default("free") // free | starter | growth | scale
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   auditRuns AuditRun[]
 }
 
-// A single audit pass over a shop's catalog (manual, or triggered by the
-// weekly re-audit job for Pro/Agence shops).
+// A single audit pass over a shop's catalog (manual click, the external
+// cron re-audit job for Starter/Growth/Scale shops, or a single-product
+// re-check from the products/update webhook).
 model AuditRun {
   id                    String   @id @default(cuid())
   shop                  String
@@ -55,7 +56,7 @@ model AuditRun {
   blockingIssueCount    Int
   recommendedIssueCount Int
   adsIssueCount         Int
-  triggeredBy           String   @default("manual") // manual | weekly | webhook
+  triggeredBy           String   @default("manual") // manual | cron | webhook
 
   shopSettings ShopSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
   issues       AuditIssue[]

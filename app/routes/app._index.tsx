@@ -7,8 +7,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLAN_IDS, planDefinition, tierOf } from "../billing-plans";
-import { auditProduct, summarizeAudit } from "../services/audit-engine.server";
-import { fetchAllProductsForAudit } from "../services/shopify-products.server";
+import { runAudit } from "../services/audit-runner.server";
 import db from "../db.server";
 
 const FREE_TIER_VISIBLE_ISSUES = 5;
@@ -28,7 +27,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     include: { issues: true },
   });
 
-  return { isPaid: hasActivePayment, tier, lastRun };
+  return {
+    isPaid: hasActivePayment,
+    tier,
+    lastRun,
+    csvExport: planDefinition(tier).csvExport,
+  };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -41,47 +45,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
   const plan = planDefinition(tier);
 
-  const { products, truncated } = await fetchAllProductsForAudit(admin, {
-    maxProducts: plan.skuLimit ?? Infinity,
-  });
-  const results = products.map(auditProduct);
-  const summary = summarizeAudit(results);
-
   await db.shopSettings.upsert({
     where: { shop: session.shop },
     create: { shop: session.shop, plan: tier },
     update: { plan: tier },
   });
 
-  const run = await db.auditRun.create({
-    data: {
-      shop: session.shop,
-      scoredProducts: summary.scoredProducts,
-      score: summary.score,
-      blockingIssueCount: summary.blockingIssueCount,
-      recommendedIssueCount: summary.recommendedIssueCount,
-      adsIssueCount: summary.adsIssueCount,
-      triggeredBy: "manual",
-      issues: {
-        create: summary.results.flatMap((r) =>
-          r.issues.map((issue) => ({
-            productId: r.productId,
-            productTitle: r.title,
-            fieldId: issue.fieldId,
-            openaiField: issue.openaiField,
-            severity: issue.severity,
-            message: issue.message,
-          })),
-        ),
-      },
-    },
+  const { runId, truncated } = await runAudit(admin, session.shop, {
+    skuLimit: plan.skuLimit,
+    triggeredBy: "manual",
   });
 
-  return { runId: run.id, truncated, skuLimit: plan.skuLimit };
+  return { runId, truncated, skuLimit: plan.skuLimit };
 };
 
 export default function Index() {
-  const { isPaid, lastRun } = useLoaderData<typeof loader>();
+  const { isPaid, lastRun, csvExport } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const isAuditing = fetcher.state !== "idle";
 
@@ -117,12 +96,22 @@ export default function Index() {
 
       <s-section heading="Score de conformité">
         {lastRun ? (
-          <s-stack direction="inline" gap="large" alignItems="center">
-            <s-heading>{lastRun.score} / 100</s-heading>
-            <s-paragraph>
-              {lastRun.scoredProducts} produits analysés — {blockingIssues.length} problèmes
-              bloquants, {otherIssues.length} recommandations.
-            </s-paragraph>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="large" alignItems="center">
+              <s-heading>{lastRun.score} / 100</s-heading>
+              <s-paragraph>
+                {lastRun.scoredProducts} produits analysés — {blockingIssues.length} problèmes
+                bloquants, {otherIssues.length} recommandations.
+              </s-paragraph>
+            </s-stack>
+            {csvExport ? (
+              <s-link href="/app/export-csv">Exporter le dernier audit en CSV</s-link>
+            ) : (
+              <s-paragraph>
+                <s-link href="/app/billing">Passez à Growth ou Scale</s-link> pour exporter vos
+                audits en CSV.
+              </s-paragraph>
+            )}
           </s-stack>
         ) : (
           <s-paragraph>
