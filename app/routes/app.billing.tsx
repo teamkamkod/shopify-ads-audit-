@@ -1,39 +1,50 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
-import { BILLING_PLANS } from "../billing-plans";
+import {
+  ALL_PAID_PLAN_IDS,
+  ANNUAL_DISCOUNT_RATE,
+  PLAN_CATALOG,
+  TRIAL_DAYS,
+  tierOf,
+  type BillingIntervalChoice,
+} from "../billing-plans";
 import db from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
 
   const { hasActivePayment, appSubscriptions } = await billing.check({
-    plans: Object.values(BILLING_PLANS),
+    plans: ALL_PAID_PLAN_IDS,
     isTest: process.env.NODE_ENV !== "production",
   });
 
-  const currentPlan = hasActivePayment ? appSubscriptions[0]?.name : "Free";
+  const currentTier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
 
   // Persisted so the products/update webhook handler can check the plan
   // without calling the Billing API on every product change.
   await db.shopSettings.upsert({
     where: { shop: session.shop },
-    create: { shop: session.shop, plan: currentPlan.toLowerCase() },
-    update: { plan: currentPlan.toLowerCase() },
+    create: { shop: session.shop, plan: currentTier },
+    update: { plan: currentTier },
   });
 
-  return { shop: session.shop, currentPlan };
+  const url = new URL(request.url);
+  const interval: BillingIntervalChoice =
+    url.searchParams.get("interval") === "annual" ? "annual" : "monthly";
+
+  return { currentTier, interval };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
-  const plan = formData.get("plan");
+  const planId = formData.get("plan");
 
-  if (plan === "Free") {
+  if (planId === "Free") {
     // Downgrading: cancel any active paid subscription.
     const { appSubscriptions } = await billing.check({
-      plans: Object.values(BILLING_PLANS),
+      plans: ALL_PAID_PLAN_IDS,
       isTest: process.env.NODE_ENV !== "production",
     });
     for (const subscription of appSubscriptions) {
@@ -50,7 +61,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { downgraded: true };
   }
 
-  if (plan !== BILLING_PLANS.PRO && plan !== BILLING_PLANS.AGENCE) {
+  if (typeof planId !== "string" || !ALL_PAID_PLAN_IDS.includes(planId)) {
     throw new Response("Unknown plan", { status: 400 });
   }
 
@@ -60,73 +71,101 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // app (with the shop/host params App Bridge needs) — a custom bare
   // app URL here isn't embedded and crashes App Bridge on the way back.
   return billing.request({
-    plan,
+    plan: planId,
     isTest: process.env.NODE_ENV !== "production",
   });
 };
 
 export default function Billing() {
-  const { currentPlan } = useLoaderData<typeof loader>();
+  const { currentTier, interval } = useLoaderData<typeof loader>();
 
-  const plans = [
-    {
-      id: "Free",
-      name: "Free",
-      price: "0 $/mois",
-      description: "Audit ponctuel à l'installation, score global + 3-5 problèmes bloquants.",
-    },
-    {
-      id: BILLING_PLANS.PRO,
-      name: "Pro",
-      price: "19 $/mois",
-      description:
-        "Rapport complet, ré-audit hebdomadaire, alerte dès qu'un produit ajouté casse la conformité.",
-    },
-    {
-      id: BILLING_PLANS.AGENCE,
-      name: "Agence",
-      price: "49 $/mois",
-      description: "Multi-boutiques sous un seul compte, export CSV des actions correctives.",
-    },
-  ];
+  const skuLabel = (limit: number | null) =>
+    limit === null ? "SKUs illimités" : `jusqu'à ${limit.toLocaleString("fr-FR")} SKUs`;
+
+  const frequencyLabel = (frequency: "none" | "weekly" | "daily") =>
+    frequency === "none"
+      ? "Pas de monitoring récurrent"
+      : frequency === "weekly"
+        ? "Ré-audit hebdomadaire + alertes"
+        : "Ré-audit quotidien + alertes";
 
   return (
     <s-page heading="Abonnement">
       <s-section heading="Choisissez votre palier">
+        <s-stack direction="inline" gap="small" alignItems="center">
+          <s-text>Facturation :</s-text>
+          <s-link href="/app/billing?interval=monthly">
+            {interval === "monthly" ? <strong>Mensuelle</strong> : "Mensuelle"}
+          </s-link>
+          <s-text>·</s-text>
+          <s-link href="/app/billing?interval=annual">
+            {interval === "annual" ? <strong>Annuelle</strong> : "Annuelle"}
+          </s-link>
+          <s-badge tone="success">
+            -{Math.round(ANNUAL_DISCOUNT_RATE * 100)}% en annuel
+          </s-badge>
+        </s-stack>
+
         <s-stack direction="block" gap="base">
-          {plans.map((plan) => (
-            <s-box
-              key={plan.id}
-              padding="base"
-              borderWidth="base"
-              borderRadius="base"
-              background={currentPlan === plan.id ? "subdued" : undefined}
-            >
-              <s-stack direction="inline" gap="base" alignItems="center">
-                <s-stack direction="block" gap="small">
-                  <s-heading>
-                    {plan.name} — {plan.price}
-                  </s-heading>
-                  <s-paragraph>{plan.description}</s-paragraph>
+          {PLAN_CATALOG.map((plan) => {
+            const isCurrent = currentTier === plan.tier;
+            const price = interval === "annual" ? plan.priceAnnual : plan.priceMonthly;
+            const priceLabel =
+              plan.tier === "free"
+                ? "0 $"
+                : interval === "annual"
+                  ? `${price} $/an`
+                  : `${price} $/mois`;
+            const planId =
+              plan.tier === "free"
+                ? "Free"
+                : interval === "annual"
+                  ? plan.annualPlanId
+                  : plan.monthlyPlanId;
+
+            return (
+              <s-box
+                key={plan.tier}
+                padding="base"
+                borderWidth="base"
+                borderRadius="base"
+                background={isCurrent ? "subdued" : undefined}
+              >
+                <s-stack direction="inline" gap="base" alignItems="center">
+                  <s-stack direction="block" gap="small">
+                    <s-heading>
+                      {plan.name} — {priceLabel}
+                    </s-heading>
+                    <s-paragraph>
+                      {skuLabel(plan.skuLimit)} · {frequencyLabel(plan.reAuditFrequency)}
+                      {plan.csvExport && " · Export CSV"}
+                      {plan.multiShop && " · Multi-boutiques"}
+                    </s-paragraph>
+                    {plan.tier !== "free" && !isCurrent && (
+                      <s-paragraph>
+                        Essai gratuit de {TRIAL_DAYS} jours, sans engagement.
+                      </s-paragraph>
+                    )}
+                  </s-stack>
+                  {isCurrent ? (
+                    <s-badge tone="success">Plan actuel</s-badge>
+                  ) : (
+                    // reloadDocument forces a real, full-page form submission
+                    // instead of a client-side fetch: billing.request()'s
+                    // redirect target is Shopify's admin.shopify.com, a
+                    // different origin than this embedded app, and only a
+                    // genuine browser navigation can escape the iframe to
+                    // follow it (a fetch-based submit just receives inert
+                    // response data instead).
+                    <Form method="post" reloadDocument>
+                      <input type="hidden" name="plan" value={planId ?? "Free"} />
+                      <s-button type="submit">Choisir</s-button>
+                    </Form>
+                  )}
                 </s-stack>
-                {currentPlan === plan.id ? (
-                  <s-badge tone="success">Plan actuel</s-badge>
-                ) : (
-                  // reloadDocument forces a real, full-page form submission
-                  // instead of a client-side fetch: billing.request()'s
-                  // redirect target is Shopify's admin.shopify.com, a
-                  // different origin than this embedded app, and only a
-                  // genuine browser navigation can escape the iframe to
-                  // follow it (a fetch-based submit just receives inert
-                  // response data instead).
-                  <Form method="post" reloadDocument>
-                    <input type="hidden" name="plan" value={plan.id} />
-                    <s-button type="submit">Choisir</s-button>
-                  </Form>
-                )}
-              </s-stack>
-            </s-box>
-          ))}
+              </s-box>
+            );
+          })}
         </s-stack>
       </s-section>
     </s-page>

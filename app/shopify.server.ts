@@ -6,8 +6,46 @@ import {
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+import type { BillingConfigSubscriptionLineItemPlan } from "@shopify/shopify-api";
 import prisma from "./db.server";
-import { BILLING_PLANS } from "./billing-plans";
+import { PLAN_CATALOG, TRIAL_DAYS } from "./billing-plans";
+
+// One Shopify billing config entry per (tier x interval): the Billing API
+// has no native monthly/annual toggle for a single plan, so each interval
+// is its own named plan (see billing-plans.ts). Annual prices are already
+// discounted, not modeled via the API's `discount` field (that's for
+// temporary promos over N cycles, not a standing annual rate).
+const billingConfig: Record<string, BillingConfigSubscriptionLineItemPlan> =
+  Object.fromEntries(
+    PLAN_CATALOG.filter((plan) => plan.tier !== "free").flatMap((plan) => [
+      [
+        plan.monthlyPlanId!,
+        {
+          trialDays: TRIAL_DAYS,
+          lineItems: [
+            {
+              amount: plan.priceMonthly,
+              currencyCode: "USD",
+              interval: BillingInterval.Every30Days,
+            },
+          ],
+        },
+      ],
+      [
+        plan.annualPlanId!,
+        {
+          trialDays: TRIAL_DAYS,
+          lineItems: [
+            {
+              amount: plan.priceAnnual,
+              currencyCode: "USD",
+              interval: BillingInterval.Annual,
+            },
+          ],
+        },
+      ],
+    ]),
+  );
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -18,26 +56,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  billing: {
-    [BILLING_PLANS.PRO]: {
-      lineItems: [
-        {
-          amount: 19,
-          currencyCode: "USD",
-          interval: BillingInterval.Every30Days,
-        },
-      ],
-    },
-    [BILLING_PLANS.AGENCE]: {
-      lineItems: [
-        {
-          amount: 49,
-          currencyCode: "USD",
-          interval: BillingInterval.Every30Days,
-        },
-      ],
-    },
-  },
+  billing: billingConfig,
   future: {
     expiringOfflineAccessTokens: true,
   },

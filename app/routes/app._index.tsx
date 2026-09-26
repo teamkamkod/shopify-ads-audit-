@@ -6,7 +6,7 @@ import type {
 import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import { BILLING_PLANS } from "../billing-plans";
+import { ALL_PAID_PLAN_IDS, planDefinition, tierOf } from "../billing-plans";
 import { auditProduct, summarizeAudit } from "../services/audit-engine.server";
 import { fetchAllProductsForAudit } from "../services/shopify-products.server";
 import db from "../db.server";
@@ -16,10 +16,11 @@ const FREE_TIER_VISIBLE_ISSUES = 5;
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
 
-  const { hasActivePayment } = await billing.check({
-    plans: Object.values(BILLING_PLANS),
+  const { hasActivePayment, appSubscriptions } = await billing.check({
+    plans: ALL_PAID_PLAN_IDS,
     isTest: process.env.NODE_ENV !== "production",
   });
+  const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
 
   const lastRun = await db.auditRun.findFirst({
     where: { shop: session.shop },
@@ -27,20 +28,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     include: { issues: true },
   });
 
-  return { isPaid: hasActivePayment, lastRun };
+  return { isPaid: hasActivePayment, tier, lastRun };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
 
-  const products = await fetchAllProductsForAudit(admin);
+  const { hasActivePayment, appSubscriptions } = await billing.check({
+    plans: ALL_PAID_PLAN_IDS,
+    isTest: process.env.NODE_ENV !== "production",
+  });
+  const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
+  const plan = planDefinition(tier);
+
+  const { products, truncated } = await fetchAllProductsForAudit(admin, {
+    maxProducts: plan.skuLimit ?? Infinity,
+  });
   const results = products.map(auditProduct);
   const summary = summarizeAudit(results);
 
   await db.shopSettings.upsert({
     where: { shop: session.shop },
-    create: { shop: session.shop },
-    update: {},
+    create: { shop: session.shop, plan: tier },
+    update: { plan: tier },
   });
 
   const run = await db.auditRun.create({
@@ -67,7 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
   });
 
-  return { runId: run.id };
+  return { runId: run.id, truncated, skuLimit: plan.skuLimit };
 };
 
 export default function Index() {
@@ -93,6 +103,17 @@ export default function Index() {
       >
         Lancer un audit
       </s-button>
+
+      {fetcher.data?.truncated && (
+        <s-banner tone="warning" heading="Catalogue partiellement audité">
+          <s-paragraph>
+            Votre catalogue dépasse la limite de {fetcher.data.skuLimit} SKUs de votre
+            palier actuel — seuls les {fetcher.data.skuLimit} premiers produits ont été
+            audités. <s-link href="/app/billing">Passez à un palier supérieur</s-link> pour
+            couvrir tout votre catalogue.
+          </s-paragraph>
+        </s-banner>
+      )}
 
       <s-section heading="Score de conformité">
         {lastRun ? (
@@ -125,8 +146,9 @@ export default function Index() {
           {!isPaid && blockingIssues.length > FREE_TIER_VISIBLE_ISSUES && (
             <s-paragraph>
               {blockingIssues.length - FREE_TIER_VISIBLE_ISSUES} problèmes supplémentaires
-              masqués. <s-link href="/app/billing">Passez au plan Pro</s-link> pour le rapport
-              complet et le ré-audit hebdomadaire automatique.
+              masqués. <s-link href="/app/billing">Passez à un palier payant</s-link> pour le
+              rapport complet et le monitoring récurrent (le plan Free se limite à un audit
+              ponctuel, sans ré-audit automatique).
             </s-paragraph>
           )}
         </s-section>

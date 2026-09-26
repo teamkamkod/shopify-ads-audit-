@@ -89,10 +89,17 @@ interface ProductsQueryResponse {
 // 50 products (with 25 variants each) per page keeps individual requests
 // well under the bucket size; on THROTTLED errors we back off and retry
 // rather than fan out concurrent requests.
+export interface ProductFetchResult {
+  products: ProductForAudit[];
+  // true when the shop has more products than the plan's SKU cap allowed
+  // us to fetch — the dashboard uses this to prompt an upgrade.
+  truncated: boolean;
+}
+
 export async function fetchAllProductsForAudit(
   admin: AdminGraphqlClient,
   { maxProducts = 500 }: { maxProducts?: number } = {},
-): Promise<ProductForAudit[]> {
+): Promise<ProductFetchResult> {
   const products: ProductForAudit[] = [];
   let cursor: string | null = null;
   let hasNextPage = true;
@@ -129,7 +136,7 @@ export async function fetchAllProductsForAudit(
     cursor = page.pageInfo.endCursor;
   }
 
-  return products;
+  return { products, truncated: hasNextPage && products.length >= maxProducts };
 }
 
 async function requestWithBackoff(

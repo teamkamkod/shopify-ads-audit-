@@ -37,7 +37,8 @@ api_version = "2025-10"
   uri = "/webhooks/app/scopes_update"
 
   # Re-audits a single product on change; the handler no-ops for shops on
-  # the Free plan (alerting is a Pro/Agence feature).
+  # the Free plan (alerting is a paid-tier feature — Free is a one-time
+  # audit only, never recurring monitoring).
   # Handled by: /app/routes/webhooks.products.update.tsx
   [[webhooks.subscriptions]]
   topics = ["products/update"]

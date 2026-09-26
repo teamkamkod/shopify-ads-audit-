@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
+import { isRecurringMonitoringTier, type PlanTier } from "../billing-plans";
 import { auditProduct, type ProductForAudit } from "../services/audit-engine.server";
 import db from "../db.server";
 
@@ -39,17 +40,17 @@ const PRODUCT_QUERY = `#graphql
   }
 `;
 
-// Alerting on a broken product is a Pro/Agence feature (see
-// shopify.app.toml). Free-tier shops still receive this webhook — Shopify
-// has no per-shop static topic filtering — so we check the plan and no-op.
+// Alerting on a broken product is a paid-tier feature (Free is a one-time
+// audit only, never recurring monitoring — see billing-plans.ts). Free-tier
+// shops still receive this webhook — Shopify has no per-shop static topic
+// filtering — so we check the plan and no-op.
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, topic, payload } = await authenticate.webhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
 
   const shopSettings = await db.shopSettings.findUnique({ where: { shop } });
-  const isPaidPlan = shopSettings?.plan === "pro" || shopSettings?.plan === "agence";
-  if (!isPaidPlan) {
+  if (!isRecurringMonitoringTier((shopSettings?.plan as PlanTier) ?? "free")) {
     return new Response();
   }
 
@@ -119,9 +120,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       },
     });
-    // TODO: send an email alert (Pro/Agence). Needs a transactional email
-    // provider (e.g. Resend/Postmark) wired up — out of scope for this
-    // scaffold, in-app alert (dashboard history) covers the MVP.
+    // TODO: send an email alert (Starter/Growth/Scale). Needs a
+    // transactional email provider (e.g. Resend/Postmark) wired up — out
+    // of scope for this scaffold, in-app alert (dashboard history)
+    // covers the MVP.
   }
 
   return new Response();

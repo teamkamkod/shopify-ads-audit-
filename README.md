@@ -25,21 +25,39 @@ jour de la spec OpenAI se fait en éditant ce fichier, pas le code métier
 
 ## Paliers de facturation (Shopify Billing API — `appSubscriptionCreate`)
 
-| Palier | Prix    | Contenu |
-| ------ | ------- | ------- |
-| Free   | 0 $     | Audit ponctuel à l'installation, score global + 3-5 problèmes bloquants |
-| Pro    | 19 $/mois | Rapport complet, alerte dès qu'un produit ajouté casse la conformité |
-| Agence | 49 $/mois | Multi-boutiques, export CSV des actions correctives |
+| Palier | Prix/mois | Prix/an (-20%) | SKUs | Contenu |
+| ------ | --------- | -------------- | ---- | ------- |
+| Free   | 0 $       | —               | jusqu'à 50 | Audit ponctuel unique, **pas** de monitoring récurrent |
+| Starter | 9 $      | 86 $            | jusqu'à 1 000 | Ré-audit hebdomadaire + alertes |
+| Growth | 19 $      | 182 $           | jusqu'à 5 000 | Ré-audit quotidien + alertes + export CSV |
+| Scale  | 39 $      | 374 $           | illimité | Multi-boutiques |
 
-Configuré dans `app/shopify.server.ts` (`billing`), page de sélection dans
-`app/routes/app.billing.tsx`.
+Essai gratuit de 7 jours sur les paliers payants (natif via `trialDays` de
+la Billing API), sans engagement. Remise annuelle de 20 % appliquée
+directement sur le prix (pas via le champ `discount` de l'API, qui sert à
+des promos temporaires, pas à un tarif annuel standard).
 
-> Le ré-audit hebdomadaire automatique (Pro/Agence) n'est pas planifié par
-> cette app elle-même — Shopify n'offre pas de cron applicatif. Il faut un
-> déclencheur externe (ex. cron du provider d'hébergement) qui appelle une
-> route dédiée exécutant la même logique que `app/routes/app._index.tsx`
-> (`action`) pour chaque boutique abonnée. À implémenter avant la
-> soumission App Store si ce point est mis en avant dans le listing.
+Le plan Free reste volontairement limité à un audit ponctuel — jamais de
+monitoring récurrent — c'est la ligne de partage qui pousse vers l'upgrade
+sans brader la valeur réelle du produit.
+
+Catalogue défini dans `app/billing-plans.ts` (source unique des prix, SKU
+caps, fréquences de ré-audit), configuré dans `app/shopify.server.ts`
+(`billing`), page de sélection dans `app/routes/app.billing.tsx` (bascule
+mensuel/annuel). Chaque tier a deux plans Shopify distincts (mensuel +
+annuel) car la Billing API n'a pas de bascule native pour un même plan.
+
+Le catalogue produit d'une boutique est audité jusqu'à la limite de SKUs
+de son palier (`app/routes/app._index.tsx` passe `skuLimit` à
+`fetchAllProductsForAudit`) ; au-delà, un bandeau invite à upgrader.
+
+> Le ré-audit automatique (hebdomadaire pour Starter, quotidien pour
+> Growth/Scale) n'est pas planifié par cette app elle-même — Shopify
+> n'offre pas de cron applicatif. Il faut un déclencheur externe (ex. cron
+> du VPS) qui appelle une route dédiée exécutant la même logique que
+> `app/routes/app._index.tsx` (`action`), à une fréquence par boutique
+> dérivée de `planDefinition(tier).reAuditFrequency`. À implémenter avant
+> la soumission App Store si ce point est mis en avant dans le listing.
 
 ## Conformité GDPR (obligatoire pour la review App Store)
 
