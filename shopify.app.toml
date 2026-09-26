@@ -1,11 +1,23 @@
 # This file stores configurations for your Shopify app.
 client_id = "75a59b2e81d7ad057f912eb542f50b5e"
 name = "ChatGPT Ads Audit"
+# Placeholder — `shopify app dev` overwrites this with the live tunnel URL
+# on each run. `shopify app deploy` sets the real production URL.
+application_url = "https://example.com"
+embedded = true
 
 [access_scopes]
 # read_products is required to read barcode/GTIN via the Admin API
 # (not exposed on the public /products.json endpoint).
 scopes = "read_products"
+
+[auth]
+# Also overwritten with the live tunnel URL by `shopify app dev`.
+redirect_urls = [
+  "https://example.com/auth/callback",
+  "https://example.com/auth/shopify/callback",
+  "https://example.com/api/auth/callback"
+]
 
 [webhooks]
 api_version = "2025-10"
