@@ -1,5 +1,5 @@
 # This file stores configurations for your Shopify app.
-client_id = ""
+client_id = "75a59b2e81d7ad057f912eb542f50b5e"
 name = "ChatGPT Ads Audit"
 
 [access_scopes]
