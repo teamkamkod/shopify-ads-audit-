@@ -35,11 +35,17 @@ export interface ProductAuditResult {
   issues: AuditIssueResult[];
 }
 
-const HTML_TAG_RE = /<\/?[a-z][\s\S]*>/i;
+// Shopify's rich-text editor always stores plain typed text wrapped in
+// safe formatting tags (<p>, <strong>, <ul>, ...) — that's not "residual
+// HTML", it's normal. Only flag markup that indicates a raw HTML dump:
+// structural/dangerous tags, inline styles, event handlers, HTML
+// comments, or the "&nbsp; soup" typical of pasting from Word/Docs.
+const SUSPICIOUS_HTML_RE =
+  /<(script|style|div|span|iframe|object|embed|meta|link|html|head|body)\b|style\s*=|on\w+\s*=|<!--|&nbsp;(\s*&nbsp;){2,}/i;
 
 function hasResidualHtml(value: string | null): boolean {
   if (!value) return false;
-  return HTML_TAG_RE.test(value);
+  return SUSPICIOUS_HTML_RE.test(value);
 }
 
 function isAllCaps(value: string): boolean {
