@@ -63,6 +63,23 @@ public `/products.json`, d'où la nécessité d'une app installée en OAuth.
 
 [Installer le Shopify CLI](https://shopify.dev/docs/apps/tools/cli/getting-started).
 
+### Base de données (production : Supabase Postgres)
+
+Le projet Supabase `chatgpt-ads-audit` (org Kamkod, région eu-west-3) sert de
+base de données de production. Dans les variables d'environnement de
+l'hébergeur (voir section Déploiement), configurer :
+
+- `DATABASE_URL` — connection string du **Transaction pooler** (port 6543,
+  `?pgbouncer=true`) : adaptée aux environnements serverless/à connexions
+  courtes.
+- `DIRECT_URL` — connection string **Direct connection** (port 5432) :
+  utilisée uniquement par `prisma migrate deploy` (le pooler ne supporte pas
+  les migrations).
+
+Les deux se trouvent dans Supabase Dashboard → Project Settings → Database →
+Connection string. Ne jamais les committer — elles restent dans les
+variables d'environnement de l'hébergeur uniquement.
+
 ### Installation
 
 ```shell
@@ -72,13 +89,22 @@ npx prisma migrate deploy
 
 ### Développement local
 
+Créer un `.env` (non commité) avec `DATABASE_URL` et `DIRECT_URL` — soit
+vers le projet Supabase de dev, soit vers un Postgres local :
+
+```
+DATABASE_URL="postgresql://...:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://...:5432/postgres"
+```
+
 ```shell
 npm run dev
 ```
 
 Le CLI se connecte à votre compte Partner, crée un tunnel, et fournit les
-variables d'environnement nécessaires (`SHOPIFY_API_KEY`,
-`SHOPIFY_API_SECRET`, `SHOPIFY_APP_URL`, `SCOPES`).
+variables d'environnement Shopify nécessaires (`SHOPIFY_API_KEY`,
+`SHOPIFY_API_SECRET`, `SHOPIFY_APP_URL`, `SCOPES`) — `DATABASE_URL`/
+`DIRECT_URL` restent à votre charge via `.env`.
 
 ### Vérifications
 
@@ -87,6 +113,33 @@ npm run typecheck
 npm run lint
 npm run build
 ```
+
+## Déploiement (production)
+
+Base de données : projet Supabase `chatgpt-ads-audit` (org Kamkod) — voir
+section ci-dessus pour les connection strings.
+
+Hébergement recommandé : [Vercel](https://vercel.com) (gratuit pour
+démarrer, détection automatique du framework React Router). Étapes :
+
+1. Importer le repo GitHub dans Vercel (New Project → sélectionner
+   `teamkamkod/shopify-ads-audit-`).
+2. Variables d'environnement à configurer dans Vercel → Settings →
+   Environment Variables : `DATABASE_URL`, `DIRECT_URL`,
+   `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES` (`read_products,
+   write_products`), `SHOPIFY_APP_URL` (l'URL de production Vercel, ex.
+   `https://chatgpt-ads-audit.vercel.app`).
+3. Après le premier déploiement, mettre à jour `application_url` et
+   `[auth].redirect_urls` dans `shopify.app.toml` avec cette URL de
+   production, puis `shopify app deploy` pour pousser la config vers
+   Shopify.
+4. Les migrations (`prisma migrate deploy`) tournent au build (`npm run
+   setup` dans `docker-start` si déploiement en conteneur ; sur Vercel,
+   les brancher en `postinstall` ou build command selon le mode choisi).
+
+Le déclencheur cron du ré-audit hebdomadaire (voir section Facturation)
+peut être un [Vercel Cron Job](https://vercel.com/docs/cron-jobs)
+(`vercel.json` → `crons`) une fois cette route implémentée.
 
 ## Structure
 
