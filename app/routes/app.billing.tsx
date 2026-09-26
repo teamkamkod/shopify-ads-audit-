@@ -55,11 +55,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   // `billing.request` redirects the merchant to Shopify's confirmation
-  // page; on approval Shopify redirects back to `returnUrl`.
+  // page; on approval Shopify redirects back to `returnUrl`. Omitting it
+  // lets the SDK default to the embedded admin.shopify.com URL for this
+  // app (with the shop/host params App Bridge needs) — a custom bare
+  // app URL here isn't embedded and crashes App Bridge on the way back.
   return billing.request({
     plan,
     isTest: process.env.NODE_ENV !== "production",
-    returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing`,
   });
 };
 
