@@ -69,16 +69,16 @@ Le projet Supabase `chatgpt-ads-audit` (org Kamkod, région eu-west-3) sert de
 base de données de production. Dans les variables d'environnement de
 l'hébergeur (voir section Déploiement), configurer :
 
-- `DATABASE_URL` — connection string du **Transaction pooler** (port 6543,
-  `?pgbouncer=true`) : adaptée aux environnements serverless/à connexions
-  courtes.
-- `DIRECT_URL` — connection string **Direct connection** (port 5432) :
-  utilisée uniquement par `prisma migrate deploy` (le pooler ne supporte pas
-  les migrations).
+- `DATABASE_URL` et `DIRECT_URL` — sur un hébergement VPS/Docker (process
+  Node persistant, pas de scale-to-zero serverless), les deux peuvent
+  pointer vers la **Direct connection** (port 5432) : le pooler
+  transaction-mode (port 6543) sert surtout à limiter les pics de
+  connexions serverless, pas nécessaire ici puisque Prisma maintient déjà
+  son propre pool de connexions dans un process long-vivant.
 
-Les deux se trouvent dans Supabase Dashboard → Project Settings → Database →
-Connection string. Ne jamais les committer — elles restent dans les
-variables d'environnement de l'hébergeur uniquement.
+Connection string dans Supabase Dashboard → Project Settings → Database.
+Ne jamais la committer — elle reste dans les variables d'environnement de
+l'hébergeur uniquement.
 
 ### Installation
 
@@ -119,27 +119,33 @@ npm run build
 Base de données : projet Supabase `chatgpt-ads-audit` (org Kamkod) — voir
 section ci-dessus pour les connection strings.
 
-Hébergement recommandé : [Vercel](https://vercel.com) (gratuit pour
-démarrer, détection automatique du framework React Router). Étapes :
+Hébergement : **VPS via Docker** (le `Dockerfile` du repo est déjà prêt à
+l'emploi — process Node standard, pas de contrainte d'adapter runtime
+particulière puisque `@shopify/shopify-app-react-router` ne supporte que
+Node.js de toute façon, pas les runtimes serverless/edge type Cloudflare
+Workers).
 
-1. Importer le repo GitHub dans Vercel (New Project → sélectionner
-   `teamkamkod/shopify-ads-audit-`).
-2. Variables d'environnement à configurer dans Vercel → Settings →
-   Environment Variables : `DATABASE_URL`, `DIRECT_URL`,
-   `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES` (`read_products,
-   write_products`), `SHOPIFY_APP_URL` (l'URL de production Vercel, ex.
-   `https://chatgpt-ads-audit.vercel.app`).
-3. Après le premier déploiement, mettre à jour `application_url` et
+Étapes :
+
+1. Sur le VPS : `docker build -t chatgpt-ads-audit .` puis lancer le
+   conteneur en exposant le port 3000 (`EXPOSE 3000` dans le Dockerfile),
+   derrière un reverse proxy (nginx/Caddy) qui gère le TLS.
+2. Variables d'environnement à passer au conteneur (`docker run -e ...`
+   ou fichier compose) : `DATABASE_URL`, `DIRECT_URL`, `SHOPIFY_API_KEY`,
+   `SHOPIFY_API_SECRET`, `SCOPES` (`read_products,write_products`),
+   `SHOPIFY_APP_URL` (l'URL publique de production, ex.
+   `https://audit.kamkod.com`).
+3. `npm run docker-start` (déjà la commande par défaut du Dockerfile)
+   exécute `prisma migrate deploy` puis démarre le serveur — les
+   migrations tournent donc à chaque démarrage du conteneur.
+4. Après le premier déploiement, mettre à jour `application_url` et
    `[auth].redirect_urls` dans `shopify.app.toml` avec cette URL de
    production, puis `shopify app deploy` pour pousser la config vers
    Shopify.
-4. Les migrations (`prisma migrate deploy`) tournent au build (`npm run
-   setup` dans `docker-start` si déploiement en conteneur ; sur Vercel,
-   les brancher en `postinstall` ou build command selon le mode choisi).
 
 Le déclencheur cron du ré-audit hebdomadaire (voir section Facturation)
-peut être un [Vercel Cron Job](https://vercel.com/docs/cron-jobs)
-(`vercel.json` → `crons`) une fois cette route implémentée.
+peut être un cron système classique (`crontab`) sur le VPS appelant une
+route dédiée, une fois cette route implémentée.
 
 ## Structure
 
