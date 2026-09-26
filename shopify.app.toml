@@ -8,8 +8,12 @@ embedded = true
 
 [access_scopes]
 # read_products is required to read barcode/GTIN via the Admin API
-# (not exposed on the public /products.json endpoint).
-scopes = "read_products"
+# (not exposed on the public /products.json endpoint). write_products
+# is also required here: the CLI's declarative-webhook scope validator
+# doesn't accept read_products alone for the products/update topic
+# (see https://github.com/Shopify/cli/issues/4417 for a similar case),
+# even though the app itself never writes products.
+scopes = "read_products,write_products"
 
 [auth]
 # Also overwritten with the live tunnel URL by `shopify app dev`.
