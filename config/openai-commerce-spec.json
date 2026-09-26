@@ -1,0 +1,118 @@
+{
+  "specVersion": "currently-stable",
+  "lastReviewed": "2026-09-26",
+  "source": "https://developers.openai.com/commerce/specs/feed",
+  "notes": "Externalized so a spec update ships as a config change, not a code change. Field ids are internal; `openaiField` maps to the feed attribute name.",
+  "fields": [
+    {
+      "id": "title",
+      "openaiField": "title",
+      "label": "Titre",
+      "severity": "blocking",
+      "rule": "maxLength",
+      "maxLength": 150,
+      "message": "Le titre dépasse 150 caractères."
+    },
+    {
+      "id": "title_all_caps",
+      "openaiField": "title",
+      "label": "Titre en majuscules",
+      "severity": "blocking",
+      "rule": "notAllCaps",
+      "message": "Le titre est entièrement en majuscules."
+    },
+    {
+      "id": "description_html",
+      "openaiField": "description",
+      "label": "Description (texte brut)",
+      "severity": "blocking",
+      "rule": "noResidualHtml",
+      "message": "La description contient du HTML résiduel (body_html non nettoyé)."
+    },
+    {
+      "id": "description_present",
+      "openaiField": "description",
+      "label": "Description présente",
+      "severity": "blocking",
+      "rule": "required",
+      "message": "Aucune description produit."
+    },
+    {
+      "id": "image_link",
+      "openaiField": "image_link",
+      "label": "Image principale",
+      "severity": "blocking",
+      "rule": "requiredResolvedUrl",
+      "message": "Aucune image produit résolue (image_link manquant ou invalide)."
+    },
+    {
+      "id": "price",
+      "openaiField": "price",
+      "label": "Prix + devise",
+      "severity": "blocking",
+      "rule": "requiredPriceWithCurrency",
+      "message": "Le prix ou la devise est manquant."
+    },
+    {
+      "id": "availability",
+      "openaiField": "availability",
+      "label": "Disponibilité",
+      "severity": "blocking",
+      "rule": "required",
+      "message": "Le statut de disponibilité (availability) est manquant."
+    },
+    {
+      "id": "link",
+      "openaiField": "link",
+      "label": "Lien produit public",
+      "severity": "blocking",
+      "rule": "requiredPublicUrl",
+      "message": "Le lien produit public est manquant ou la boutique n'est pas publiée."
+    },
+    {
+      "id": "barcode",
+      "openaiField": "gtin",
+      "label": "Code-barres / GTIN",
+      "severity": "recommended",
+      "rule": "gtinFormat",
+      "minDigits": 8,
+      "maxDigits": 14,
+      "message": "Aucun GTIN valide (8 à 14 chiffres) sur au moins une variante.",
+      "note": "Lecture uniquement via l'Admin API (read_products) — absent de /products.json public."
+    },
+    {
+      "id": "vendor",
+      "openaiField": "brand",
+      "label": "Marque / vendor",
+      "severity": "recommended",
+      "rule": "required",
+      "message": "Le champ vendor (marque) est manquant."
+    },
+    {
+      "id": "product_category",
+      "openaiField": "product_category",
+      "label": "Catégorie produit",
+      "severity": "recommended",
+      "rule": "requiredMappedCategory",
+      "message": "product_type n'est pas mappé à une product_category standard."
+    },
+    {
+      "id": "condition",
+      "openaiField": "condition",
+      "label": "État du produit",
+      "severity": "recommended",
+      "rule": "alwaysMissingNative",
+      "message": "Le champ condition n'existe pas nativement dans Shopify : à renseigner via metafield pour être conforme.",
+      "note": "Signalé systématiquement tant qu'aucun metafield de condition n'est configuré."
+    },
+    {
+      "id": "variant_grouping",
+      "openaiField": "item_group_id",
+      "label": "Regroupement de variantes (couleur/taille)",
+      "severity": "ads",
+      "rule": "requiredVariantOptions",
+      "expectedOptions": ["color", "size", "couleur", "taille"],
+      "message": "Structure de variantes insuffisante pour un regroupement item_group_id cohérent (is_ads_eligible)."
+    }
+  ]
+}

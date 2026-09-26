@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// One row per shop; created lazily on first audit or billing interaction.
+model ShopSettings {
+  shop      String   @id
+  plan      String   @default("free") // free | pro | agence
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditRuns AuditRun[]
+}
+
+// A single audit pass over a shop's catalog (manual, or triggered by the
+// weekly re-audit job for Pro/Agence shops).
+model AuditRun {
+  id                    String   @id @default(cuid())
+  shop                  String
+  createdAt             DateTime @default(now())
+  scoredProducts        Int
+  score                 Int
+  blockingIssueCount    Int
+  recommendedIssueCount Int
+  adsIssueCount         Int
+  triggeredBy           String   @default("manual") // manual | weekly | webhook
+
+  shopSettings ShopSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
+  issues       AuditIssue[]
+
+  @@index([shop, createdAt])
+}
+
+model AuditIssue {
+  id           String   @id @default(cuid())
+  auditRunId   String
+  productId    String
+  productTitle String
+  fieldId      String
+  openaiField  String
+  severity     String // blocking | recommended | ads
+  message      String
+  createdAt    DateTime @default(now())
+
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+
+  @@index([auditRunId])
+}

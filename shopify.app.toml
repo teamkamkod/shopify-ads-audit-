@@ -1,0 +1,45 @@
+# This file stores configurations for your Shopify app.
+client_id = ""
+name = "ChatGPT Ads Audit"
+
+[access_scopes]
+# read_products is required to read barcode/GTIN via the Admin API
+# (not exposed on the public /products.json endpoint).
+scopes = "read_products"
+
+[webhooks]
+api_version = "2025-10"
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  # Re-audits a single product on change; the handler no-ops for shops on
+  # the Free plan (alerting is a Pro/Agence feature).
+  # Handled by: /app/routes/webhooks.products.update.tsx
+  [[webhooks.subscriptions]]
+  topics = ["products/update"]
+  uri = "/webhooks/products/update"
+
+  # Mandatory compliance topics for public apps.
+  # See: https://shopify.dev/docs/apps/build/privacy-law-compliance
+  # Handled by: /app/routes/webhooks.customers.data_request.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = ["customers/data_request"]
+
+  # Handled by: /app/routes/webhooks.customers.redact.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = ["customers/redact"]
+
+  # Handled by: /app/routes/webhooks.shop.redact.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = ["shop/redact"]
