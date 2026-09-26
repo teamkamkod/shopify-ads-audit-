@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { Form, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { BILLING_PLANS } from "../billing-plans";
 import db from "../db.server";
@@ -65,9 +65,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Billing() {
   const { currentPlan } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher();
-
-  const choosePlan = (plan: string) => fetcher.submit({ plan }, { method: "POST" });
 
   const plans = [
     {
@@ -113,7 +110,17 @@ export default function Billing() {
                 {currentPlan === plan.id ? (
                   <s-badge tone="success">Plan actuel</s-badge>
                 ) : (
-                  <s-button onClick={() => choosePlan(plan.id)}>Choisir</s-button>
+                  // reloadDocument forces a real, full-page form submission
+                  // instead of a client-side fetch: billing.request()'s
+                  // redirect target is Shopify's admin.shopify.com, a
+                  // different origin than this embedded app, and only a
+                  // genuine browser navigation can escape the iframe to
+                  // follow it (a fetch-based submit just receives inert
+                  // response data instead).
+                  <Form method="post" reloadDocument>
+                    <input type="hidden" name="plan" value={plan.id} />
+                    <s-button type="submit">Choisir</s-button>
+                  </Form>
                 )}
               </s-stack>
             </s-box>
