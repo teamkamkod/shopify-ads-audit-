@@ -8,11 +8,11 @@
 // back to the tier slug for feature-gating (SKU caps, alerting, etc.).
 export const BILLING_PLANS = {
   STARTER_MONTHLY: "Starter",
-  STARTER_ANNUAL: "Starter (annuel)",
+  STARTER_ANNUAL: "Starter (annual)",
   GROWTH_MONTHLY: "Growth",
-  GROWTH_ANNUAL: "Growth (annuel)",
+  GROWTH_ANNUAL: "Growth (annual)",
   SCALE_MONTHLY: "Scale",
-  SCALE_ANNUAL: "Scale (annuel)",
+  SCALE_ANNUAL: "Scale (annual)",
 } as const;
 
 export type PlanTier = "free" | "starter" | "growth" | "scale";
@@ -97,6 +97,18 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   },
 ];
 
+// Plan names are the subscription identifiers Shopify stores and returns
+// via the Billing API, so renaming one would silently stop matching any
+// subscription created under the previous name. The annual plans were
+// originally named "Starter (annuel)" etc. before the UI moved to English;
+// those names stay accepted here so an existing subscription never gets
+// misread as Free after the rename.
+export const LEGACY_PLAN_NAMES: Record<string, PlanTier> = {
+  "Starter (annuel)": "starter",
+  "Growth (annuel)": "growth",
+  "Scale (annuel)": "scale",
+};
+
 const PLAN_NAME_TO_TIER: Record<string, PlanTier> = Object.fromEntries(
   PLAN_CATALOG.flatMap((plan) => [
     ...(plan.monthlyPlanId ? [[plan.monthlyPlanId, plan.tier]] : []),
@@ -106,7 +118,7 @@ const PLAN_NAME_TO_TIER: Record<string, PlanTier> = Object.fromEntries(
 
 export function tierOf(shopifyPlanName: string | null | undefined): PlanTier {
   if (!shopifyPlanName) return "free";
-  return PLAN_NAME_TO_TIER[shopifyPlanName] ?? "free";
+  return PLAN_NAME_TO_TIER[shopifyPlanName] ?? LEGACY_PLAN_NAMES[shopifyPlanName] ?? "free";
 }
 
 export function planDefinition(tier: PlanTier): PlanDefinition {

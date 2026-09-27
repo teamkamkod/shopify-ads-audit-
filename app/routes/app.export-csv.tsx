@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
 
   if (!planDefinition(tier).csvExport) {
-    throw new Response("L'export CSV nécessite le palier Growth ou Scale.", { status: 403 });
+    throw new Response("CSV export requires the Growth or Scale plan.", { status: 403 });
   }
 
   const lastRun = await db.auditRun.findFirst({
@@ -30,10 +30,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   if (!lastRun) {
-    throw new Response("Aucun audit à exporter.", { status: 404 });
+    throw new Response("No audit to export.", { status: 404 });
   }
 
-  const header = ["Produit", "Champ OpenAI", "Sévérité", "Message"];
+  const header = ["Product", "OpenAI field", "Severity", "Message"];
   const rows = lastRun.issues.map((issue) => [
     issue.productTitle,
     issue.openaiField,

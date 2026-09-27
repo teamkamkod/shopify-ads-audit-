@@ -71,20 +71,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const inviteCode = await createLinkInvite(session.shop);
       return { inviteCode };
     } catch (error) {
-      return { error: error instanceof Error ? error.message : "Erreur inconnue." };
+      return { error: error instanceof Error ? error.message : "Unknown error." };
     }
   }
 
   if (intent === "redeem-invite") {
     const code = formData.get("code");
     if (typeof code !== "string" || !code.trim()) {
-      return { error: "Merci de saisir un code." };
+      return { error: "Please enter a code." };
     }
     try {
       const primaryShop = await redeemLinkInvite(code, session.shop);
       return { linked: primaryShop };
     } catch (error) {
-      return { error: error instanceof Error ? error.message : "Erreur inconnue." };
+      return { error: error instanceof Error ? error.message : "Unknown error." };
     }
   }
 
@@ -145,44 +145,44 @@ export default function Billing() {
   const unlinkFetcher = useFetcher<typeof action>();
 
   const skuLabel = (limit: number | null) =>
-    limit === null ? "SKUs illimités" : `jusqu'à ${limit.toLocaleString("fr-FR")} SKUs`;
+    limit === null ? "Unlimited SKUs" : `Up to ${limit.toLocaleString("en-US")} SKUs`;
 
   const frequencyLabel = (frequency: "none" | "weekly" | "daily") =>
     frequency === "none"
-      ? "Pas de monitoring récurrent"
+      ? "No recurring monitoring"
       : frequency === "weekly"
-        ? "Ré-audit hebdomadaire + alertes"
-        : "Ré-audit quotidien + alertes";
+        ? "Weekly re-audit + alerts"
+        : "Daily re-audit + alerts";
 
   return (
-    <s-page heading="Abonnement">
+    <s-page heading="Subscription">
       {linkedTo && (
-        <s-banner tone="info" heading="Boutique liée">
+        <s-banner tone="info" heading="Linked store">
           <s-paragraph>
-            Cette boutique bénéficie du palier Scale via l&apos;abonnement de{" "}
-            <strong>{linkedTo}</strong>, sans facturation séparée.
+            This store is on the Scale plan through the subscription of <strong>{linkedTo}</strong>,
+            with no separate billing.
           </s-paragraph>
           <unlinkFetcher.Form method="post">
             <input type="hidden" name="intent" value="unlink" />
             <s-button type="submit" {...(unlinkFetcher.state !== "idle" ? { loading: true } : {})}>
-              Délier cette boutique
+              Unlink this store
             </s-button>
           </unlinkFetcher.Form>
         </s-banner>
       )}
 
-      <s-section heading="Choisissez votre palier">
+      <s-section heading="Choose your plan">
         <s-stack direction="inline" gap="small" alignItems="center">
-          <s-text>Facturation :</s-text>
+          <s-text>Billing:</s-text>
           <s-link href="/app/billing?interval=monthly">
-            {interval === "monthly" ? <strong>Mensuelle</strong> : "Mensuelle"}
+            {interval === "monthly" ? <strong>Monthly</strong> : "Monthly"}
           </s-link>
           <s-text>·</s-text>
           <s-link href="/app/billing?interval=annual">
-            {interval === "annual" ? <strong>Annuelle</strong> : "Annuelle"}
+            {interval === "annual" ? <strong>Annual</strong> : "Annual"}
           </s-link>
           <s-badge tone="success">
-            -{Math.round(ANNUAL_DISCOUNT_RATE * 100)}% en annuel
+            -{Math.round(ANNUAL_DISCOUNT_RATE * 100)}% on annual
           </s-badge>
         </s-stack>
 
@@ -192,10 +192,10 @@ export default function Billing() {
             const price = interval === "annual" ? plan.priceAnnual : plan.priceMonthly;
             const priceLabel =
               plan.tier === "free"
-                ? "0 $"
+                ? "$0"
                 : interval === "annual"
-                  ? `${price} $/an`
-                  : `${price} $/mois`;
+                  ? `$${price}/year`
+                  : `$${price}/month`;
             const planId =
               plan.tier === "free"
                 ? "Free"
@@ -218,17 +218,17 @@ export default function Billing() {
                     </s-heading>
                     <s-paragraph>
                       {skuLabel(plan.skuLimit)} · {frequencyLabel(plan.reAuditFrequency)}
-                      {plan.csvExport && " · Export CSV"}
-                      {plan.multiShop && ` · Multi-boutiques (jusqu'à ${plan.maxLinkedShops} liées)`}
+                      {plan.csvExport && " · CSV export"}
+                      {plan.multiShop && ` · Multi-store (up to ${plan.maxLinkedShops} linked)`}
                     </s-paragraph>
                     {plan.tier !== "free" && !isCurrent && (
                       <s-paragraph>
-                        Essai gratuit de {TRIAL_DAYS} jours, sans engagement.
+                        Free {TRIAL_DAYS}-day trial, no commitment.
                       </s-paragraph>
                     )}
                   </s-stack>
                   {isCurrent ? (
-                    <s-badge tone="success">Plan actuel</s-badge>
+                    <s-badge tone="success">Current plan</s-badge>
                   ) : (
                     // reloadDocument forces a real, full-page form submission
                     // instead of a client-side fetch: billing.request()'s
@@ -239,7 +239,7 @@ export default function Billing() {
                     // response data instead).
                     <Form method="post" reloadDocument>
                       <input type="hidden" name="plan" value={planId ?? "Free"} />
-                      <s-button type="submit">Choisir</s-button>
+                      <s-button type="submit">Choose</s-button>
                     </Form>
                   )}
                 </s-stack>
@@ -250,9 +250,9 @@ export default function Billing() {
       </s-section>
 
       {canManageLinkedShops && (
-        <s-section heading="Boutiques liées (Scale)">
+        <s-section heading="Linked stores (Scale)">
           <s-paragraph>
-            {linkedShops.length} / {maxLinkedShops} boutiques liées à cet abonnement.
+            {linkedShops.length} / {maxLinkedShops} stores linked to this subscription.
           </s-paragraph>
           {linkedShops.length > 0 && (
             <s-stack direction="block" gap="small">
@@ -267,15 +267,15 @@ export default function Billing() {
               type="submit"
               {...(inviteFetcher.state !== "idle" ? { loading: true } : {})}
             >
-              Générer un code d&apos;invitation
+              Generate an invite code
             </s-button>
           </inviteFetcher.Form>
           {inviteFetcher.data && "inviteCode" in inviteFetcher.data && (
             <s-banner tone="success">
               <s-paragraph>
-                Code : <strong>{inviteFetcher.data.inviteCode}</strong> (valable 15 minutes) — à
-                saisir dans la page Abonnement de l&apos;autre boutique, section « Lier cette
-                boutique à un abonnement Scale ».
+                Code: <strong>{inviteFetcher.data.inviteCode}</strong> (valid for 15 minutes) —
+                enter it on the other store&apos;s Subscription page, in the{" "}
+                &quot;Link this store to a Scale subscription&quot; section.
               </s-paragraph>
             </s-banner>
           )}
@@ -288,25 +288,24 @@ export default function Billing() {
       )}
 
       {!linkedTo && currentTier !== "scale" && (
-        <s-section heading="Lier cette boutique à un abonnement Scale">
+        <s-section heading="Link this store to a Scale subscription">
           <s-paragraph>
-            Si une autre boutique paie déjà le palier Scale, entrez ici le code d&apos;invitation
-            qu&apos;elle vous a communiqué pour rejoindre le même abonnement sans facturation
-            séparée.
+            If another store already pays for Scale, enter the invite code it gave you to join the
+            same subscription without separate billing.
           </s-paragraph>
           <redeemFetcher.Form method="post">
             <input type="hidden" name="intent" value="redeem-invite" />
-            <s-text-field name="code" label="Code d'invitation" placeholder="ex. A1B2C3D4" />
+            <s-text-field name="code" label="Invite code" placeholder="e.g. A1B2C3D4" />
             <s-button
               type="submit"
               {...(redeemFetcher.state !== "idle" ? { loading: true } : {})}
             >
-              Lier cette boutique
+              Link this store
             </s-button>
           </redeemFetcher.Form>
           {redeemFetcher.data && "linked" in redeemFetcher.data && (
             <s-banner tone="success">
-              <s-paragraph>Boutique liée avec succès.</s-paragraph>
+              <s-paragraph>Store linked successfully.</s-paragraph>
             </s-banner>
           )}
           {redeemFetcher.data && "error" in redeemFetcher.data && (

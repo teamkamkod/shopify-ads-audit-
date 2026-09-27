@@ -23,13 +23,13 @@ export async function resolveEffectiveTier(shop: string, ownTier: PlanTier): Pro
 export async function createLinkInvite(primaryShop: string): Promise<string> {
   const primary = await db.shopSettings.findUnique({ where: { shop: primaryShop } });
   if (primary?.plan !== "scale") {
-    throw new Error("Seule une boutique payant elle-même le palier Scale peut inviter d'autres boutiques.");
+    throw new Error("Only a store paying for the Scale plan itself can invite other stores.");
   }
 
   const cap = planDefinition("scale").maxLinkedShops;
   const linkedCount = await db.shopSettings.count({ where: { primaryShopDomain: primaryShop } });
   if (linkedCount >= cap) {
-    throw new Error(`Limite de ${cap} boutiques liées atteinte pour cet abonnement.`);
+    throw new Error(`Limit of ${cap} linked stores reached for this subscription.`);
   }
 
   const code = crypto.randomBytes(4).toString("hex").toUpperCase();
@@ -44,21 +44,21 @@ export async function redeemLinkInvite(rawCode: string, requestingShop: string):
   const invite = await db.shopLinkInvite.findUnique({ where: { code } });
 
   if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
-    throw new Error("Code invalide ou expiré.");
+    throw new Error("Invalid or expired code.");
   }
   if (invite.primaryShop === requestingShop) {
-    throw new Error("Une boutique ne peut pas se lier à elle-même.");
+    throw new Error("A store cannot link to itself.");
   }
 
   const primary = await db.shopSettings.findUnique({ where: { shop: invite.primaryShop } });
   if (primary?.plan !== "scale") {
-    throw new Error("La boutique invitante n'est plus sur le palier Scale.");
+    throw new Error("The inviting store is no longer on the Scale plan.");
   }
 
   const cap = planDefinition("scale").maxLinkedShops;
   const linkedCount = await db.shopSettings.count({ where: { primaryShopDomain: invite.primaryShop } });
   if (linkedCount >= cap) {
-    throw new Error("Limite de boutiques liées atteinte pour cet abonnement.");
+    throw new Error("Linked stores limit reached for this subscription.");
   }
 
   await db.$transaction([

@@ -72,7 +72,7 @@ export async function sendBlockingIssuesAlert(
   const remaining = blockingIssues.length - listedIssues.length;
 
   const html = `
-    <p>Le ré-audit automatique de votre catalogue (${scoredProducts} produit${scoredProducts > 1 ? "s" : ""} analysé${scoredProducts > 1 ? "s" : ""}) a détecté ${blockingIssues.length} problème${blockingIssues.length > 1 ? "s" : ""} bloquant${blockingIssues.length > 1 ? "s" : ""} pour votre feed ChatGPT Ads / Shopping :</p>
+    <p>The automatic re-audit of your catalog (${scoredProducts} product${scoredProducts === 1 ? "" : "s"} analyzed) found ${blockingIssues.length} blocking issue${blockingIssues.length === 1 ? "" : "s"} affecting your ChatGPT Ads / Shopping feed:</p>
     <ul>
       ${listedIssues
         .map(
@@ -81,15 +81,15 @@ export async function sendBlockingIssuesAlert(
         )
         .join("\n      ")}
     </ul>
-    ${remaining > 0 ? `<p>…et ${remaining} autre${remaining > 1 ? "s" : ""}.</p>` : ""}
-    ${dashboardUrl ? `<p><a href="${dashboardUrl}">Voir le détail dans le dashboard</a></p>` : ""}
+    ${remaining > 0 ? `<p>…and ${remaining} more.</p>` : ""}
+    ${dashboardUrl ? `<p><a href="${dashboardUrl}">View the details in the dashboard</a></p>` : ""}
   `.trim();
 
   try {
     await resend.emails.send({
       from: process.env.EMAIL_FROM || "ChatGPT Ads Audit <alerts@kamkod.com>",
       to,
-      subject: `${blockingIssues.length} problème${blockingIssues.length > 1 ? "s" : ""} bloquant${blockingIssues.length > 1 ? "s" : ""} détecté${blockingIssues.length > 1 ? "s" : ""} sur ${shop}`,
+      subject: `${blockingIssues.length} blocking issue${blockingIssues.length === 1 ? "" : "s"} detected on ${shop}`,
       html,
     });
   } catch (error) {

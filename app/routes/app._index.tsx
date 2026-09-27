@@ -79,55 +79,53 @@ export default function Index() {
     : blockingIssues.slice(0, FREE_TIER_VISIBLE_ISSUES);
 
   return (
-    <s-page heading="Audit ChatGPT Ads / Shopping">
+    <s-page heading="ChatGPT Ads / Shopping audit">
       <s-button
         slot="primary-action"
         onClick={runAudit}
         {...(isAuditing ? { loading: true } : {})}
       >
-        Lancer un audit
+        Run audit
       </s-button>
 
       {fetcher.data?.truncated && (
-        <s-banner tone="warning" heading="Catalogue partiellement audité">
+        <s-banner tone="warning" heading="Catalog only partially audited">
           <s-paragraph>
-            Votre catalogue dépasse la limite de {fetcher.data.skuLimit} SKUs de votre
-            palier actuel — seuls les {fetcher.data.skuLimit} premiers produits ont été
-            audités. <s-link href="/app/billing">Passez à un palier supérieur</s-link> pour
-            couvrir tout votre catalogue.
+            Your catalog exceeds the {fetcher.data.skuLimit} SKU limit of your current plan —
+            only the first {fetcher.data.skuLimit} products were audited.{" "}
+            <s-link href="/app/billing">Upgrade your plan</s-link> to cover your full catalog.
           </s-paragraph>
         </s-banner>
       )}
 
-      <s-section heading="Score de conformité">
+      <s-section heading="Compliance score">
         {lastRun ? (
           <s-stack direction="block" gap="base">
             <s-stack direction="inline" gap="large" alignItems="center">
               <s-heading>{lastRun.score} / 100</s-heading>
               <s-paragraph>
-                {lastRun.scoredProducts} produits analysés — {blockingIssues.length} problèmes
-                bloquants, {otherIssues.length} recommandations.
+                {lastRun.scoredProducts} products analyzed — {blockingIssues.length} blocking
+                issues, {otherIssues.length} recommendations.
               </s-paragraph>
             </s-stack>
             {csvExport ? (
-              <s-link href="/app/export-csv">Exporter le dernier audit en CSV</s-link>
+              <s-link href="/app/export-csv">Export the latest audit as CSV</s-link>
             ) : (
               <s-paragraph>
-                <s-link href="/app/billing">Passez à Growth ou Scale</s-link> pour exporter vos
-                audits en CSV.
+                <s-link href="/app/billing">Upgrade to Growth or Scale</s-link> to export your
+                audits as CSV.
               </s-paragraph>
             )}
           </s-stack>
         ) : (
           <s-paragraph>
-            Aucun audit encore lancé. Cliquez sur « Lancer un audit » pour analyser votre
-            catalogue.
+            No audit has been run yet. Select &quot;Run audit&quot; to analyze your catalog.
           </s-paragraph>
         )}
       </s-section>
 
       {blockingIssues.length > 0 && (
-        <s-section heading="Problèmes bloquants">
+        <s-section heading="Blocking issues">
           <s-stack direction="block" gap="base">
             {visibleBlockingIssues.map((issue) => (
               <s-box key={issue.id} padding="small" borderWidth="base" borderRadius="base">
@@ -139,24 +137,23 @@ export default function Index() {
           </s-stack>
           {!isPaid && blockingIssues.length > FREE_TIER_VISIBLE_ISSUES && (
             <s-paragraph>
-              {blockingIssues.length - FREE_TIER_VISIBLE_ISSUES} problèmes supplémentaires
-              masqués. <s-link href="/app/billing">Passez à un palier payant</s-link> pour le
-              rapport complet et le monitoring récurrent (le plan Free se limite à un audit
-              ponctuel, sans ré-audit automatique).
+              {blockingIssues.length - FREE_TIER_VISIBLE_ISSUES} more issues hidden.{" "}
+              <s-link href="/app/billing">Upgrade to a paid plan</s-link> for the full report and
+              recurring monitoring (the Free plan is limited to a one-time audit, with no
+              automatic re-audit).
             </s-paragraph>
           )}
         </s-section>
       )}
 
-      <s-section slot="aside" heading="Ce que cet audit vérifie">
+      <s-section slot="aside" heading="What this audit checks">
         <s-paragraph>
-          La préparation de vos données produit par rapport à la spec OpenAI Commerce
-          (title, description, image, prix, disponibilité, GTIN, marque, catégorie…).
+          How ready your product data is for the OpenAI Commerce spec (title, description, image,
+          price, availability, GTIN, brand, category…).
         </s-paragraph>
         <s-paragraph>
-          Cet audit ne vérifie pas votre statut d&apos;indexation réel dans ChatGPT ni votre
-          inscription au OpenAI Merchant Program — ces informations ne sont pas accessibles
-          depuis l&apos;extérieur.
+          This audit does not check your actual indexing status in ChatGPT or your enrollment in
+          the OpenAI Merchant Program — that information is not accessible from the outside.
         </s-paragraph>
       </s-section>
     </s-page>

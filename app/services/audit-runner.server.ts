@@ -7,7 +7,7 @@ interface AdminGraphqlClient {
   graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response>;
 }
 
-// Shared by the manual "Lancer un audit" action (app._index.tsx) and the
+// Shared by the manual "Run audit" action (app._index.tsx) and the
 // external cron endpoint (routes/cron.reaudit.tsx) — one place to keep the
 // fetch → score → persist pipeline consistent between the two triggers.
 export async function runAudit(
