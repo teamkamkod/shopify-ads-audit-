@@ -61,7 +61,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response();
   }
 
-  const { admin } = await unauthenticated.admin(shop);
+  // A paid shop whose offline token can no longer be refreshed (app
+  // uninstalled, token revoked) makes `unauthenticated.admin()` throw the
+  // SDK's bare `Response(500)` — the same defect the webhook wrapper degrades
+  // for. Without an admin client there is no product to fetch, so acknowledge
+  // the delivery and log it, the way the hourly cron tolerates a per-shop
+  // failure instead of failing the whole batch.
+  const adminResult = await unauthenticated.admin(shop).catch(() => null);
+  if (!adminResult) {
+    console.error(
+      `[webhook] products/update for ${shop}: no admin client (offline token cannot be refreshed), skipping`,
+    );
+    return new Response();
+  }
+  const { admin } = adminResult;
   const response = await admin.graphql(PRODUCT_QUERY, { variables: { id: productId } });
   const json = (await response.json()) as {
     data?: { product: null | Omit<ProductForAudit, "featuredImageUrl" | "priceRangeMin" | "currencyCode" | "variants"> & {
