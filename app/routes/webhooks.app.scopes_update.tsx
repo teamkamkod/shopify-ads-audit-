@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {

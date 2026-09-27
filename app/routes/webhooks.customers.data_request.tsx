@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 
 // Mandatory GDPR compliance webhook: a customer or store owner requesting
 // the customer data this app holds. This app does not store any

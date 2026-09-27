@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 import { ALL_PAID_PLAN_IDS, planDefinition, tierOf } from "../billing-plans";
 import db from "../db.server";
 

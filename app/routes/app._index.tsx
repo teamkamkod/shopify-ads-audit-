@@ -5,7 +5,7 @@ import type {
 } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 import { ALL_PAID_PLAN_IDS, planDefinition, tierOf } from "../billing-plans";
 import { runAudit } from "../services/audit-runner.server";
 import { resolveEffectiveTier } from "../services/shop-links.server";

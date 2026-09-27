@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 
 // Mandatory GDPR compliance webhook: erase any customer data this app
 // holds, 10 days after a redaction request. This app does not store any

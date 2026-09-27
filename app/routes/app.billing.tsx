@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, useFetcher, useLoaderData } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
 import {
   ALL_PAID_PLAN_IDS,
   ANNUAL_DISCOUNT_RATE,

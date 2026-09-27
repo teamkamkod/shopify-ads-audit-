@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate, unauthenticated } from "../shopify.server";
+import { authenticate } from "../shopify-auth.server";
+import { unauthenticated } from "../shopify.server";
 import { isRecurringMonitoringTier, type PlanTier } from "../billing-plans";
 import { auditProduct, type ProductForAudit } from "../services/audit-engine.server";
 import { sendBlockingIssuesAlert } from "../services/mailer.server";
