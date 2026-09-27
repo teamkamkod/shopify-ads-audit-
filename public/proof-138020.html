@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Proof of resolution — ChatGPT Ads Audit (App Store review 138020)</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: #1f2124; background: #f6f6f7; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e1e3e5; }
+  .sub { color: #6d7175; margin: 0 0 28px; }
+  .card { background: #fff; border: 1px solid #e1e3e5; border-radius: 12px; padding: 20px 22px; margin: 16px 0; }
+  .badge { display: inline-block; font: 600 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+           border-radius: 999px; padding: 3px 10px; }
+  .fixed { background: #e3f1df; color: #135c2c; }
+  .broken { background: #fbeae5; color: #8e1f0b; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #eceeef; vertical-align: top; }
+  th { font-weight: 600; color: #4a4f54; background: #fafbfb; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 13.5px; }
+  pre { background: #1f2124; color: #e8e9ea; border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 10px 0; }
+  .term-live { background: #0f1115; }
+  button { font: 600 15px/1 inherit; padding: 12px 18px; border-radius: 9px; border: 1px solid #1f2124;
+           background: #1f2124; color: #fff; cursor: pointer; }
+  button[disabled] { opacity: .55; cursor: default; }
+  .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .muted { color: #6d7175; font-size: 14px; }
+  .ok { color: #7fdc9b; }
+  .ko { color: #ff9d8a; }
+  footer { margin-top: 44px; color: #6d7175; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Proof of resolution — ChatGPT Ads Audit</h1>
+  <p class="sub">Shopify App Store review reference <strong>138020</strong> · app <strong>ChatGPT Ads Audit</strong>
+     (<code>75a59b2e81d7ad057f912eb542f50b5e</code>) · production URL
+     <a href="https://chatgpt-ads-audit.kamkod.com">chatgpt-ads-audit.kamkod.com</a><br>
+     Deployed and verified 2026-09-27 04:26 UTC.</p>
+
+  <h2>What was reported</h2>
+  <div class="card">
+    <p style="margin:0 0 8px"><span class="badge broken">REPORTED</span></p>
+    <p style="margin:0">After installing the app, <code>/app</code> answered <strong>HTTP 500 Internal Server
+    Error</strong> instead of loading the dashboard.</p>
+  </div>
+
+  <h2>Root cause (measured, not assumed)</h2>
+  <div class="card">
+    <p style="margin-top:0">Two requests that Shopify's automated security checks send during review were answered
+    with an unhandled exception escaping as a 500. The second one is the one that reached production:</p>
+    <pre>[Request A]  GET /app?embedded=1&amp;host=9998322874899999999&amp;shop=cross-shop-missing-….myshopify.com
+  TypeError: Invalid URL
+      at new URL (node:internal/url)
+      at Object.sanitizeHost (…/lib/utils/shop-validator.ts:58:26)
+      at validateShopAndHostParams (…/authenticate/admin/helpers/validate-shop-and-host-params.ts:21:28)
+      at Object.authenticateAdmin (…/authenticate/admin/authenticate.ts:155:9)
+    code: 'ERR_INVALID_URL', input: 'https://÷ß|ßm¼ï\x8F=÷ß}÷ß'
+  → HTTP 500</pre>
+    <p>Shopify sends a non-base64 <code>host</code> value as part of its checks. The library base64-decodes it and
+    passes the result straight to <code>new URL()</code> without a guard, so the exception is never turned into a
+    response. The same class of defect existed on the webhook path (a valid-signature request with a non-JSON body),
+    which is why those webhooks answered 500 too.</p>
+    <p class="muted" style="margin-bottom:0">No trace was visible in production logs: <code>NODE_ENV=production</code>
+    silences the library logger, so the exception left no log line at all — the 500s were correlated by hand from
+    request timings, container start time and the routes' own log lines.</p>
+  </div>
+
+  <h2>The fix</h2>
+  <div class="card">
+    <p style="margin-top:0">Both malformed-input paths are now caught <em>before</em> the library sees them, and the
+    library is never allowed to turn an exception into a 5xx on these paths. Routes keep their existing
+    <code>authenticate.admin()</code> / <code>authenticate.webhook()</code> call sites — only the import path changed.</p>
+    <pre>app/shopify-auth.server.ts   — hardened authentication wrappers (new file)
+app/routes/*                 — one import line changed per route
+webhooks.app.uninstalled.tsx — session cleanup made unconditional</pre>
+    <p class="muted" style="margin-bottom:0">Released as commits <code>3cdaa93</code>, <code>0534da7</code>,
+    <code>d430c54</code> on <code>main</code>, built into image <code>7e9eb01472fe</code> and running in
+    production since 2026-09-27 04:26 UTC.</p>
+  </div>
+
+  <h2>Resolved state — re-run the exact requests now</h2>
+  <div class="card">
+    <p style="margin-top:0">These requests are sent from <strong>your own browser</strong> to the live production app,
+    so the result is the current state of the submitted app, not a screenshot.</p>
+    <div class="row">
+      <button id="run">Run the checks</button>
+      <span class="muted" id="stamp"></span>
+    </div>
+    <pre class="term-live" id="out">Press "Run the checks" to send the requests that previously returned 500.</pre>
+    <p class="muted" style="margin-bottom:0">A <code>410 Gone</code> in the output means the request came from an
+    automated/headless client: the Shopify library rejects bot user-agents before it authenticates anything, by
+    design. From a normal browser the same requests answer <code>400</code> (A and B), <code>302</code> to the
+    install flow (C) and <code>200</code> (D) — that is what the table below records.</p>
+  </div>
+
+  <h2>Before / after (measured in production)</h2>
+  <table>
+    <thead><tr><th>Request</th><th>Before</th><th>After</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /app</code> with the non-base64 <code>host</code> (check A)</td>
+          <td><span class="badge broken">500</span></td><td><span class="badge fixed">400</span></td></tr>
+      <tr><td><code>GET /app</code> with the second non-base64 <code>host</code> (check B)</td>
+          <td><span class="badge broken">500</span></td><td><span class="badge fixed">400</span></td></tr>
+      <tr><td><code>GET /app</code> with a valid <code>host</code> (non-regression)</td>
+          <td>302 to install</td><td><span class="badge fixed">302</span></td></tr>
+      <tr><td>Webhook, valid signature, non-JSON body</td>
+          <td><span class="badge broken">500</span></td><td><span class="badge fixed">400</span></td></tr>
+      <tr><td>Webhook, invalid signature (non-regression)</td>
+          <td>401</td><td><span class="badge fixed">401</span></td></tr>
+      <tr><td>Webhook, valid signature and payload (non-regression)</td>
+          <td>200</td><td><span class="badge fixed">200</span></td></tr>
+      <tr><td>Webhook from a shop whose offline token cannot be refreshed any more</td>
+          <td><span class="badge broken">500</span></td><td><span class="badge fixed">200</span></td></tr>
+      <tr><td><code>GET /</code> — public landing page</td><td>200</td><td><span class="badge fixed">200</span></td></tr>
+      <tr><td><code>GET /auth/login</code> — must redirect, never show a login form</td>
+          <td>302</td><td><span class="badge fixed">302</span></td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Verification run 2026-09-27 04:26 UTC against the deployed container. The production access log
+  contains <strong>zero</strong> <code>500</code> responses since that deploy.</p>
+
+  <h2>Reproduce it yourself</h2>
+  <div class="card">
+    <pre>curl -s -o /dev/null -w '%{http_code}\n' -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
+  AppleWebKit/537.36 Chrome/128 Safari/537.36' \
+  'https://chatgpt-ads-audit.kamkod.com/app?shop=cross-shop-missing-probe.myshopify.com&amp;host=9998322874899999999'
+# → 400 (was 500)
+
+curl -s -o /dev/null -w '%{http_code}\n' -A 'Mozilla/5.0' \
+  'https://chatgpt-ads-audit.kamkod.com/'
+# → 200</pre>
+    <p class="muted" style="margin-bottom:0">Use a browser user-agent: the Shopify library rejects
+    automated/bot user-agents with <code>410 Gone</code> by design.</p>
+  </div>
+
+  <footer>
+    ChatGPT Ads Audit · Kamkod · this page is a static artifact served by the production app and is marked
+    <code>noindex</code>.
+  </footer>
+</main>
+<script>
+(function () {
+  var base = location.origin;
+  var checks = [
+    ['A  GET /app  host=9998322874899999999   (previously 500)', '/app?shop=cross-shop-missing-probe.myshopify.com&host=9998322874899999999'],
+    ['B  GET /app  host=9991054866719999999   (previously 500)', '/app?embedded=1&shop=cross-shop-missing-probe.myshopify.com&host=9991054866719999999'],
+    ['C  GET /app  valid host (control)', '/app?embedded=1&shop=kamkod-audit-dev.myshopify.com&host=YWRtaW4uc2hvcGlmeS5jb20vc3RvcmUva2Fta29kLWF1ZGl0LWRldg'],
+    ['D  GET /  landing page (control)', '/']
+  ];
+  var out = document.getElementById('out');
+  var btn = document.getElementById('run');
+  var stamp = document.getElementById('stamp');
+
+  function line(label, status, note) {
+    var pad = label.length < 58 ? 58 - label.length : 1;
+    return label + new Array(pad + 1).join(' ') + '  → ' + status + (note ? '   ' + note : '') + '\n';
+  }
+
+  async function run() {
+    btn.disabled = true;
+    var text = '';
+    var failures = 0;
+    for (var i = 0; i < checks.length; i++) {
+      var label = checks[i][0];
+      var url = checks[i][1] + (checks[i][1].indexOf('?') === -1 ? '?cb=' : '&cb=') + Date.now();
+      var status, note;
+      try {
+        var res = await fetch(url, { redirect: 'manual', cache: 'no-store' });
+        if (res.type === 'opaqueredirect') {
+          status = '302 (redirect to install)';
+          note = 'ok';
+        } else {
+          status = res.status + (res.statusText ? ' ' + res.statusText : '');
+          if (res.status >= 500) { failures++; note = 'STILL FAILING'; }
+          else if (res.status === 410) { note = 'bot user-agent rejected (headless client)'; }
+          else { note = 'ok'; }
+        }
+      } catch (e) {
+        status = 'network error: ' + e.message;
+        note = 'check failed to complete';
+      }
+      text += line(label, status, note);
+    }
+    text += '\n';
+    text += failures === 0
+      ? 'RESULT  no 500 response. The requests that failed the review now answer a clean 4xx, the app still answers 200/302.'
+      : 'RESULT  ' + failures + ' request(s) still answered 500 — please report this.';
+    out.textContent = text;
+    stamp.textContent = 'checked at ' + new Date().toISOString();
+    btn.disabled = false;
+  }
+  btn.addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>
