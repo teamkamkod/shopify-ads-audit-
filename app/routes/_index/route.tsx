@@ -1,7 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
-
-import { login } from "../../shopify.server";
+import { redirect } from "react-router";
 
 import styles from "./styles.module.css";
 
@@ -14,6 +12,11 @@ export const meta = () => [
   },
 ];
 
+// There is deliberately no shop-domain input here. Shopify requires
+// installation to start from a Shopify surface (App Store listing, Partner
+// link) and forbids asking a merchant to type `.myshopify.com` by hand.
+// A request that already carries `shop` is a hand-off from Shopify, so it is
+// forwarded to the embedded app, which runs the OAuth handshake.
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
@@ -21,12 +24,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return null;
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
-
   return (
     <div className={styles.index}>
       <div className={styles.content}>
@@ -35,18 +36,6 @@ export default function App() {
           Audit your Shopify product data against the OpenAI Commerce feed spec in one click — and
           get alerted whenever a product change breaks compliance.
         </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
         <ul className={styles.list}>
           <li>
             <strong>Blocking checks.</strong> Title, description, image, price, availability and
@@ -65,9 +54,9 @@ export default function App() {
           Free for catalogs up to 50 SKUs. Paid plans from $9/month, with a 7-day free trial.
         </p>
         <p className={styles.note}>
-          This app audits how ready your product data is for the OpenAI Commerce spec. It does not
-          report your actual indexing status in ChatGPT or your enrollment in the OpenAI Merchant
-          Program — neither is accessible outside OpenAI.
+          Install from the Shopify App Store. This app audits how ready your product data is for the
+          OpenAI Commerce spec; it does not report your actual indexing status in ChatGPT or your
+          enrollment in the OpenAI Merchant Program — neither is accessible outside OpenAI.
         </p>
       </div>
     </div>

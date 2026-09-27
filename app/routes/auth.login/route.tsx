@@ -1,49 +1,23 @@
-import { AppProvider } from "@shopify/shopify-app-react-router/react";
-import { useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+import { redirect } from "react-router";
 
-import { login } from "../../shopify.server";
-import { loginErrorMessage } from "./error.server";
-
+// This route used to render the scaffold's manual shop-domain form, which
+// fails the App Store requirement that installation always starts from a
+// Shopify surface. The path is kept alive (instead of deleted) so a link or
+// bookmark never lands on a 404 — but it never asks for a domain.
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  const url = new URL(request.url);
 
-  return { errors };
+  // A `shop` parameter means Shopify handed the merchant over for
+  // install/auth: forward into the embedded app, which does the OAuth
+  // handshake with Shopify and triggers the install prompt.
+  if (url.searchParams.get("shop")) {
+    throw redirect(`/app?${url.searchParams.toString()}`);
+  }
+
+  throw redirect("/");
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
-
-  return {
-    errors,
-  };
+export const action = async () => {
+  throw redirect("/");
 };
-
-export default function Auth() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const [shop, setShop] = useState("");
-  const { errors } = actionData || loaderData;
-
-  return (
-    <AppProvider embedded={false}>
-      <s-page>
-        <Form method="post">
-        <s-section heading="Log in">
-          <s-text-field
-            name="shop"
-            label="Shop domain"
-            details="example.myshopify.com"
-            value={shop}
-            onChange={(e) => setShop(e.currentTarget.value)}
-            autocomplete="on"
-            error={errors.shop}
-          ></s-text-field>
-          <s-button type="submit">Log in</s-button>
-        </s-section>
-        </Form>
-      </s-page>
-    </AppProvider>
-  );
-}
