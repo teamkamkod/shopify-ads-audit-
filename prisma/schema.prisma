@@ -42,6 +42,30 @@ model ShopSettings {
   updatedAt DateTime @updatedAt
 
   auditRuns AuditRun[]
+
+  // Multi-shop (Scale tier): a shop can link itself to another shop's Scale
+  // subscription instead of paying for its own — `plan` is then set to
+  // "scale" directly (see app/services/shop-links.server.ts) so every other
+  // consumer (cron, webhook) needs no special-casing. Null = independent.
+  primaryShopDomain String?
+  primaryShop       ShopSettings?  @relation("ShopLink", fields: [primaryShopDomain], references: [shop], onDelete: SetNull)
+  linkedShops       ShopSettings[] @relation("ShopLink")
+}
+
+// A one-time code a paying Scale shop generates so another shop's own
+// merchant can opt that shop into the subscription — proves consent from
+// whoever installed the second shop, since the primary shop has no way to
+// claim a shop it doesn't control.
+model ShopLinkInvite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  primaryShop String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  usedByShop  String?
+  usedAt      DateTime?
+
+  @@index([primaryShop])
 }
 
 // A single audit pass over a shop's catalog (manual click, the external

@@ -30,6 +30,10 @@ export interface PlanDefinition {
   reAuditFrequency: "none" | "weekly" | "daily";
   csvExport: boolean;
   multiShop: boolean;
+  // Other shops that can link to this shop's subscription instead of
+  // paying for their own (see app/services/shop-links.server.ts). 0 for
+  // every non-Scale tier.
+  maxLinkedShops: number;
   priceMonthly: number; // 0 for Free
   priceAnnual: number; // 0 for Free
   monthlyPlanId: string | null; // Shopify billing config key, null for Free
@@ -44,6 +48,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
     reAuditFrequency: "none",
     csvExport: false,
     multiShop: false,
+    maxLinkedShops: 0,
     priceMonthly: 0,
     priceAnnual: 0,
     monthlyPlanId: null,
@@ -56,6 +61,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
     reAuditFrequency: "weekly",
     csvExport: false,
     multiShop: false,
+    maxLinkedShops: 0,
     priceMonthly: 9,
     priceAnnual: 86,
     monthlyPlanId: BILLING_PLANS.STARTER_MONTHLY,
@@ -68,6 +74,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
     reAuditFrequency: "daily",
     csvExport: true,
     multiShop: false,
+    maxLinkedShops: 0,
     priceMonthly: 19,
     priceAnnual: 182,
     monthlyPlanId: BILLING_PLANS.GROWTH_MONTHLY,
@@ -80,6 +87,9 @@ export const PLAN_CATALOG: PlanDefinition[] = [
     reAuditFrequency: "daily",
     csvExport: true,
     multiShop: true,
+    // Not specified by the original pricing brief — 5 is a starting cap,
+    // easy to raise later if it turns out too tight for real agency use.
+    maxLinkedShops: 5,
     priceMonthly: 39,
     priceAnnual: 374,
     monthlyPlanId: BILLING_PLANS.SCALE_MONTHLY,

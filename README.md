@@ -102,6 +102,37 @@ champ OpenAI, sévérité, message). Gate sur `planDefinition(tier).csvExport`
 (`app/routes/app._index.tsx`) uniquement quand la fonctionnalité est
 disponible sur le palier courant.
 
+## Multi-boutiques (Scale)
+
+Shopify facture chaque installation séparément — il n'existe pas
+d'abonnement natif partagé entre plusieurs boutiques. Le multi-boutiques
+Scale est donc implémenté comme un **lien** entre boutiques plutôt qu'un
+abonnement groupé côté Shopify :
+
+1. Une boutique qui paie elle-même le palier Scale (`app/routes/app.billing.tsx`,
+   section « Boutiques liées ») génère un code d'invitation à usage unique,
+   valable 15 minutes (`createLinkInvite` dans
+   `app/services/shop-links.server.ts`).
+2. Le marchand de l'**autre** boutique saisit ce code dans sa propre page
+   Abonnement (section « Lier cette boutique à un abonnement Scale »).
+   C'est volontairement la boutique invitée qui doit agir — la boutique
+   invitante ne peut pas lier une boutique qu'elle ne contrôle pas.
+3. Une fois liée, cette boutique a `ShopSettings.plan = "scale"` directement
+   en base — le cron de ré-audit, le webhook `products/update` et l'export
+   CSV n'ont donc aucun cas particulier à gérer pour une boutique liée.
+4. À chaque visite du dashboard ou de la page Abonnement, la boutique liée
+   revérifie que la boutique invitante est toujours sur Scale
+   (`resolveEffectiveTier`) — si celle-ci s'est désabonnée, la boutique
+   liée repasse automatiquement sur Free au prochain chargement.
+5. Choisir un palier soi-même (y compris Free) délie automatiquement la
+   boutique de tout abonnement Scale externe.
+
+Plafond de boutiques liées par abonnement : `maxLinkedShops` dans
+`app/billing-plans.ts` (actuellement 5 pour Scale — chiffre non spécifié
+dans le brief initial, à ajuster si besoin). Seule une boutique qui paie
+elle-même Scale peut générer des invitations (pas de chaînage de boutiques
+liées entre elles).
+
 ## Conformité GDPR (obligatoire pour la review App Store)
 
 Les 3 webhooks obligatoires sont configurés dans `shopify.app.toml` et gérés

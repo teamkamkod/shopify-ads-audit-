@@ -8,6 +8,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLAN_IDS, planDefinition, tierOf } from "../billing-plans";
 import { runAudit } from "../services/audit-runner.server";
+import { resolveEffectiveTier } from "../services/shop-links.server";
 import db from "../db.server";
 
 const FREE_TIER_VISIBLE_ISSUES = 5;
@@ -19,7 +20,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     plans: ALL_PAID_PLAN_IDS,
     isTest: process.env.NODE_ENV !== "production",
   });
-  const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
+  const ownTier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
+  // Folds in an inherited Scale tier for a shop linked to another shop's
+  // subscription — its own billing.check legitimately reports no payment.
+  const tier = await resolveEffectiveTier(session.shop, ownTier);
 
   const lastRun = await db.auditRun.findFirst({
     where: { shop: session.shop },
@@ -28,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return {
-    isPaid: hasActivePayment,
+    isPaid: tier !== "free",
     tier,
     lastRun,
     csvExport: planDefinition(tier).csvExport,
@@ -42,7 +46,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     plans: ALL_PAID_PLAN_IDS,
     isTest: process.env.NODE_ENV !== "production",
   });
-  const tier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
+  const ownTier = hasActivePayment ? tierOf(appSubscriptions[0]?.name) : "free";
+  const tier = await resolveEffectiveTier(session.shop, ownTier);
   const plan = planDefinition(tier);
 
   await db.shopSettings.upsert({
