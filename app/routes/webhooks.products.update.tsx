@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
 import { isRecurringMonitoringTier, type PlanTier } from "../billing-plans";
 import { auditProduct, type ProductForAudit } from "../services/audit-engine.server";
+import { sendBlockingIssuesAlert } from "../services/mailer.server";
 import db from "../db.server";
 
 const PRODUCT_QUERY = `#graphql
@@ -120,10 +121,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       },
     });
-    // TODO: send an email alert (Starter/Growth/Scale). Needs a
-    // transactional email provider (e.g. Resend/Postmark) wired up — out
-    // of scope for this scaffold, in-app alert (dashboard history)
-    // covers the MVP.
+
+    await sendBlockingIssuesAlert(admin, shop, {
+      scoredProducts: 1,
+      blockingIssues: blockingIssues.map((issue) => ({
+        productTitle: result.title,
+        message: issue.message,
+      })),
+    });
   }
 
   return new Response();

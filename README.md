@@ -73,10 +73,25 @@ Exemple d'entrée crontab :
 0 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://audit.kamkod.com/cron/reaudit
 ```
 
-L'envoi d'une alerte email sur un nouvel audit bloquant reste un TODO
-(marqué dans `app/services/audit-runner.server.ts`) — nécessite un
-fournisseur d'email transactionnel (Resend/Postmark) non encore câblé ;
-le nouvel audit apparaît déjà dans l'historique du dashboard entre-temps.
+## Alertes email (Starter / Growth / Scale)
+
+Un email est envoyé au contact de la boutique (`shop.contactEmail`, avec
+repli sur `shop.email` via l'Admin API) dès qu'un ré-audit automatique
+(cron ou webhook `products/update`) détecte un nouveau problème bloquant.
+Implémenté dans `app/services/mailer.server.ts` via
+[Resend](https://resend.com), appelé depuis `audit-runner.server.ts` (cron
++ audit manuel — no-op sur `triggeredBy: "manual"`, l'alerting reste une
+fonctionnalité des paliers payants avec monitoring récurrent) et depuis
+`webhooks.products.update.tsx`.
+
+Variables d'environnement requises :
+
+- `RESEND_API_KEY` — clé API Resend. Si absente, l'envoi est simplement
+  sauté (`console.warn`) : l'audit lui-même n'échoue jamais faute
+  d'alerting configuré.
+- `EMAIL_FROM` (optionnel) — adresse d'expédition, ex.
+  `"ChatGPT Ads Audit <alerts@kamkod.com>"`. Le domaine d'envoi doit être
+  vérifié dans le dashboard Resend avant le lancement.
 
 ## Export CSV (Growth / Scale)
 
@@ -180,9 +195,10 @@ Workers).
    ou fichier compose) : `DATABASE_URL`, `DIRECT_URL`, `SHOPIFY_API_KEY`,
    `SHOPIFY_API_SECRET`, `SCOPES` (`read_products,write_products`),
    `SHOPIFY_APP_URL` (l'URL publique de production, ex.
-   `https://audit.kamkod.com`), `CRON_SECRET` (chaîne aléatoire générée,
-   ex. `openssl rand -hex 32` — protège `/cron/reaudit`, voir section
-   ci-dessus).
+   `https://audit.kamkod.com`), `CRON_SECRET` (voir note Hermes
+   ci-dessous — protège `/cron/reaudit`), `RESEND_API_KEY` et `EMAIL_FROM`
+   (voir section Alertes email ci-dessus — sans `RESEND_API_KEY` les
+   audits tournent normalement mais aucune alerte n'est envoyée).
 3. `npm run docker-start` (déjà la commande par défaut du Dockerfile)
    exécute `prisma migrate deploy` puis démarre le serveur — les
    migrations tournent donc à chaque démarrage du conteneur.
@@ -190,10 +206,17 @@ Workers).
    `[auth].redirect_urls` dans `shopify.app.toml` avec cette URL de
    production, puis `shopify app deploy` pour pousser la config vers
    Shopify.
+5. Ajouter l'entrée crontab du ré-audit automatique (voir section
+   Ré-audit automatique ci-dessus pour la ligne exacte).
 
-Le déclencheur cron du ré-audit hebdomadaire (voir section Facturation)
-peut être un cron système classique (`crontab`) sur le VPS appelant une
-route dédiée, une fois cette route implémentée.
+> **Note pour Hermes (déploiement VPS) :** `CRON_SECRET` n'existe encore
+> nulle part — il n'est pas dans le repo (jamais commité, comme les autres
+> secrets) ni pré-généré ailleurs. À la mise en place du VPS, générer une
+> valeur aléatoire (`openssl rand -hex 32`), la mettre dans les variables
+> d'environnement du conteneur, et réutiliser exactement la même valeur
+> dans l'entrée crontab qui appelle `POST /cron/reaudit` (voir section
+> Ré-audit automatique) — sinon la route renvoie 401 et aucun ré-audit
+> automatique ne tourne.
 
 ## Structure
 
