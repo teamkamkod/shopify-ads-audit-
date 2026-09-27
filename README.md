@@ -240,6 +240,22 @@ Workers).
 5. Ajouter l'entrée crontab du ré-audit automatique (voir section
    Ré-audit automatique ci-dessus pour la ligne exacte).
 
+> **Note pour Hermes (migrations Prisma) :** la migration
+> `prisma/migrations/20260927120000_multi_shop_scale/` (support
+> multi-boutiques Scale) a été écrite à la main, sans jamais se connecter à
+> la base Supabase — cet environnement de dev n'a pas accès à
+> `DATABASE_URL`/`DIRECT_URL` (ils ne sont jamais commités, ils restent
+> dans les variables d'environnement de l'hébergeur, cf. section Base de
+> données). Elle n'a donc **jamais été exécutée ni vérifiée contre une
+> vraie base**, contrairement aux migrations précédentes. `prisma migrate
+> deploy` (étape 3 ci-dessus, lancé à chaque démarrage du conteneur)
+> l'appliquera automatiquement au premier déploiement qui inclut ce
+> commit — mais surveiller les logs de ce premier démarrage pour confirmer
+> qu'elle passe sans erreur avant de considérer le déploiement terminé. En
+> cas d'échec : comparer `migration.sql` au schéma réel de la table
+> `ShopSettings` sur Supabase (dashboard → Table Editor, ou
+> `mcp__Supabase__list_tables`) plutôt que de la corriger à l'aveugle.
+
 > **Note pour Hermes (déploiement VPS) :** `CRON_SECRET` n'existe encore
 > nulle part — il n'est pas dans le repo (jamais commité, comme les autres
 > secrets) ni pré-généré ailleurs. À la mise en place du VPS, générer une
