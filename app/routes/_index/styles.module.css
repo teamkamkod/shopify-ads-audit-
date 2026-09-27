@@ -4,6 +4,9 @@
   justify-content: center;
   height: 100%;
   width: 100%;
+  /* Without this, width:100% + padding makes the page wider than the
+     viewport and adds a horizontal scrollbar on the landing page. */
+  box-sizing: border-box;
   text-align: center;
   padding: 1rem;
 }
@@ -60,6 +63,12 @@
 .list > li {
   max-width: 20rem;
   text-align: left;
+}
+
+.note {
+  font-size: 0.9rem;
+  max-width: 46rem;
+  margin: 0 auto;
 }
 
 @media only screen and (max-width: 50rem) {
