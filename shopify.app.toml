@@ -3,7 +3,7 @@ client_id = "75a59b2e81d7ad057f912eb542f50b5e"
 name = "ChatGPT Ads Audit"
 # Placeholder — `shopify app dev` overwrites this with the live tunnel URL
 # on each run. `shopify app deploy` sets the real production URL.
-application_url = "https://example.com"
+application_url = "https://chatgpt-ads-audit.kamkod.com"
 embedded = true
 
 [access_scopes]
@@ -18,9 +18,9 @@ scopes = "read_products,write_products"
 [auth]
 # Also overwritten with the live tunnel URL by `shopify app dev`.
 redirect_urls = [
-  "https://example.com/auth/callback",
-  "https://example.com/auth/shopify/callback",
-  "https://example.com/api/auth/callback"
+  "https://chatgpt-ads-audit.kamkod.com/auth/callback",
+  "https://chatgpt-ads-audit.kamkod.com/auth/shopify/callback",
+  "https://chatgpt-ads-audit.kamkod.com/api/auth/callback"
 ]
 
 [webhooks]
